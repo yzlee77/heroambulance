@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HERO MedAssist App - Light Theme</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Modern, Formal Light Theme
+                        'bg-main': '#F9FAFB',     // Main Background (near white)
+                        'bg-card': '#FFFFFF',     // Card/Panel Background (pure white)
+                        'border-subtle': '#E5E7EB', // Subtle border/divider (Gray-200)
+                        'accent-blue': '#3B82F6',  // Primary actions/Highlight (Blue-500)
+                        'accent-red': '#EF4444',    // Critical/Submit (Red-500)
+                        'accent-green': '#10B981', // Success/Log (Emerald-500)
+                        'text-main': '#1F2937',     // Main text color (Gray-900)
+                        'text-muted': '#6B7280',    // Muted text color (Gray-500)
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['ui-monospace', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Base styles for a full-screen tablet experience */
+        html, body { height: 100%; margin: 0; }
+        body {
+            background-color: #F9FAFB; /* bg-main */
+            color: #1F2937; /* text-main */
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Prevent body scroll */
+        }
+        /* Ensure main content takes the remaining viewport height */
+        main {
+            /* Full height minus header (h-20) and flexible footer */
+            /* Height calculation updated to be more flexible for footer */
+            height: calc(100vh - 5rem);
+            margin-bottom: -4.25rem; /* Pull content down to account for footer */
+            padding-bottom: 4.25rem; /* Add padding to bottom to avoid overlap */
+        }
+
+        #form-view {
+             height: 100%;
+        }
+
+        #section-detail {
+            height: 100%; /* Ensure right pane can scroll independently */
+        }
+
+        /* Light Theme Inputs */
+        input[type="number"], input[type="text"], input[type="date"], input[type="time"], textarea, select {
+            background-color: #FFFFFF !important; /* bg-card for inputs */
+            border: 1px solid #D1D5DB !important; /* Gray-300 border */
+            color: #1F2937 !important; /* text-main */
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        input:disabled, textarea:disabled, select:disabled {
+             background-color: #F3F4F6 !important;
+             color: #6B7280 !important;
+        }
+        /* Style for disabled submit button */
+        #footer-submit:disabled {
+            background-color: #E5E7EB; /* Gray-200 */
+            color: #9CA3AF; /* Muted text */
+            cursor: not-allowed;
+            box-shadow: none;
+            transition: none;
+        }
+        .touch-target {
+            min-height: 48px;
+        }
+        .vitals-entry-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            background-color: #F3F4F6; /* Gray-100 */
+            border-radius: 0.375rem;
+        }
+        /* Style specifically for the GCS entry inputs to look clean */
+        .gcs-entry-row input.gcs-input {
+            padding: 0.5rem 0.25rem !important;
+            font-size: 1.125rem;
+            font-weight: bold;
+            text-align: center;
+            background-color: #F3F4F6 !important;
+        }
+        .gcs-entry-row input.gcs-input:disabled {
+            background-color: #E5E7EB !important;
+        }
+
+        /* Style for invalid GCS inputs */
+        .gcs-input.invalid {
+            border: 2px solid #EF4444 !important; /* accent-red */
+            background-color: #FEF2F2 !important; /* red-50 */
+        }
+
+        /* Styles for the temporary container used for PDF generation */
+        .pdf-render-container {
+            position: absolute;
+            left: -9999px;
+            top: 0;
+            background-color: white;
+            padding: 20px;
+            width: 210mm; /* A4 width */
+            font-family: 'Inter', sans-serif;
+            color: #1F2937;
+        }
+        .pdf-render-container h1, .pdf-render-container h2 {
+            border-bottom: 1px solid #E5E7EB;
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+        }
+        .pdf-render-container .section-break {
+            page-break-inside: avoid;
+            margin-bottom: 24px;
+        }
+        .pdf-render-container label {
+            font-weight: 500;
+            color: #6B7280;
+        }
+        .pdf-render-container input, .pdf-render-container select, .pdf-render-container textarea {
+            width: 100%;
+            border: 1px solid #D1D5DB;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 4px;
+        }
+
+        /* Style for dynamically added mandatory indicator */
+        .dynamic-mandatory-indicator {
+            color: #EF4444; /* accent-red */
+            margin-left: 0.25rem;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body class="antialiased flex flex-col h-screen">
+
+    <!-- Fixed Header (Primary Blue Nav Bar) -->
+    <header class="h-20 bg-accent-blue border-b border-blue-700 z-20 p-4 shadow-xl flex justify-between items-center text-sm sm:text-base flex-shrink-0">
+        <!-- Header Left: App Name and Icon -->
+        <div id="header-left" class="flex items-center space-x-2">
+            <!-- Red Ambulance Icon SVG -->
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8 text-accent-red bg-white p-1 rounded-full shadow-lg">
+                <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM9.75 8.75V7.5a.75.75 0 0 1 1.5 0v1.25a.5.5 0 0 0 .5.5h1.25a.75.75 0 0 1 0 1.5H11.75a.5.5 0 0 0-.5.5v1.25a.75.75 0 0 1-1.5 0v-1.25a.5.5 0 0 0-.5-.5H8.75a.75.75 0 0 1 0-1.5h1.25a.5.5 0 0 0 .5-.5V7.5Z" clip-rule="evenodd" />
+                <path d="M12.75 14.25a.75.75 0 0 0-1.5 0v1.25a.5.5 0 0 1-.5.5H9.75a.75.75 0 0 0 0 1.5h1.25a.5.5 0 0 1 .5.5v1.25a.75.75 0 0 0 1.5 0v-1.25a.5.5 0 0 1 .5-.5h1.25a.75.75 0 0 0 0-1.5h-1.25a.5.5 0 0 1-.5-.5v-1.25Z" />
+            </svg>
+            <span class="font-extrabold text-white text-xl">HERO</span>
+        </div>
+
+        <!-- Header Center: View Title -->
+        <h1 id="header-center" class="font-light text-2xl text-white"></h1>
+
+        <!-- Header Right: User and Sync Status -->
+        <div id="header-right" class="flex items-center space-x-4">
+            <span class="text-white/80 text-lg hidden sm:inline">Ambulance 1</span>
+            <!-- Sync Status Icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-accent-green">
+                <path fill-rule="evenodd" d="M19.927 1.834a2.25 2.25 0 0 1 1.055 1.588V6a4.5 4.5 0 0 0-1.079 8.28l-.759-.76a1.5 1.5 0 0 1-2.122 0l-.096-.096a1.5 1.5 0 0 1 0-2.122l.759-.759A2.25 2.25 0 0 0 18 8.25V5.558a.75.75 0 0 0-.17-.492l-.462-.461a.75.75 0 0 0-.492-.17H5.558a.75.75 0 0 0-.492.17l-.461.462a.75.75 0 0 0-.17.492V15.75a2.25 2.25 0 0 1-1.464 2.112l-1.077.34a.75.75 0 0 0-.573.704v.75c0 .341.282.617.617.617H4.5a2.25 2.25 0 0 0 2.25-2.25v-1.954a1.5 1.5 0 0 1 1.464-1.464h1.954a2.25 2.25 0 0 0 2.25-2.25v-1.954a1.5 1.5 0 0 1 1.464-1.464h1.954a2.25 2.25 0 0 0 2.25-2.25V3.422a.75.75 0 0 0-.17-.492l-.462-.461a.75.75 0 0 0-.492-.17H3.422a.75.75 0 0 0-.492.17l-.461.462a.75.75 0 0 0-.17.492v15.078a.75.75 0 0 0 .17.492l.461.461a.75.75 0 0 0 .492.17h.653a3.75 3.75 0 0 1 0 7.5h.75a3.75 3.75 0 0 1 0-7.5h.75a3.75 3.75 0 0 1 0-7.5h1.954a3.75 3.75 0 0 1 0-7.5h1.954a3.75 3.75 0 0 1 0-7.5h1.954a.75.75 0 0 0 .492-.17l.461-.462a.75.75 0 0 0 .17-.492V3.422c0-.184.07-.36.196-.492L2.748 2.469a2.25 2.25 0 0 1 1.464-1.464h15.751Z" clip-rule="evenodd" />
+            </svg>
+        </div>
+    </header>
+
+    <!-- Main Content Area: Split View Container -->
+    <main class="flex-1 flex max-w-7xl mx-auto w-full overflow-hidden">
+
+        <!-- ---------------------------------------------------- -->
+        <!-- 1. HOME VIEW (Full Width - Dashboard Redesign)       -->
+        <!-- ---------------------------------------------------- -->
+        <div id="home-view" class="p-4 sm:p-8 w-full overflow-y-auto">
+            <h2 class="text-3xl font-light mb-8 text-text-main">Operational Dashboard</h2>
+
+            <!-- Dashboard Stats and Primary CTA Section (Grid for tablets/desktop) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 max-w-6xl mx-auto">
+
+                <!-- 1. CREATE NEW INCIDENT CARD -->
+                <button onclick="showForm(generateNewCaseId())" class="md:col-span-1 bg-accent-red text-white font-extrabold p-6 rounded-xl shadow-xl hover:bg-red-600 transition flex flex-col items-center justify-center space-y-2 text-xl touch-target w-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7">
+                        <path d="M11.75 3.75a.75.75 0 0 0-1.5 0v4.354L5.59 5.86a.75.75 0 0 0-1.18.919l2.844 3.793a.75.75 0 0 0 .919.262 4.5 4.5 0 0 1 5.433 0 .75.75 0 0 0 .92-.262l2.843-3.793a.75.75 0 1 0-1.18-.919l-4.66 2.244V3.75Z" />
+                        <path fill-rule="evenodd" d="M12 21a.75.75 0 0 1 .75-.75h.375a6.75 6.75 0 0 0 3.197-12.443.75.75 0 0 1 .843-.655c.67.085 1.35.152 2.03.193a.75.75 0 0 1 .632.748V21a1.5 1.5 0 0 1-1.5 1.5H5.25A1.5 1.5 0 0 1 3.75 21V7.197c0-.441.32-.806.754-.834.68-.041 1.36-.108 2.03-.193a.75.75 0 0 1 .843.655 6.75 6.75 0 0 0 3.197 12.443h.375A.75.75 0 0 1 12 21Z" clip-rule="evenodd" />
+                    </svg>
+                    <span>CREATE NEW INCIDENT</span>
+                </button>
+
+                <!-- 2. OPERATIONAL SNAPSHOT CARD (Updated) -->
+                <div class="md:col-span-2 bg-bg-card p-6 rounded-xl shadow-xl border border-border-subtle grid grid-cols-3 gap-4">
+                    <h4 class="col-span-full text-lg font-semibold text-text-main border-b border-border-subtle pb-2 mb-2">Operational Snapshot</h4>
+                    <div class="text-center p-2 bg-gray-50 rounded-lg flex flex-col justify-center">
+                        <p class="text-4xl font-extrabold text-text-main flex items-baseline justify-center"><span id="snapshot-time">09:24</span><span id="snapshot-ampm" class="text-2xl ml-1">AM</span></p>
+                        <p class="text-sm text-text-muted">Current Time</p>
+                    </div>
+                    <div class="text-center p-2 bg-gray-50 rounded-lg flex flex-col justify-center">
+                        <p class="text-4xl font-extrabold text-yellow-600">2</p>
+                        <p class="text-sm text-text-muted">In Progress</p>
+                    </div>
+                    <div class="text-center p-2 bg-gray-50 rounded-lg flex flex-col justify-center">
+                        <p class="text-4xl font-extrabold text-accent-green">3</p>
+                        <p class="text-sm text-text-muted">Submitted</p>
+                    </div>
+                </div>
+            </div>
+            <!-- End Dashboard Grid -->
+
+            <!-- Case History List -->
+            <div class="space-y-4 max-w-6xl mx-auto">
+                <div class="flex justify-between items-center border-b border-border-subtle pb-2">
+                    <!-- Wording updated here -->
+                    <h3 class="text-xl font-semibold text-accent-blue">Case History (In Progress & Submitted)</h3>
+                    <button onclick="generateBulkPdfReport()" class="bg-gray-200 text-text-main font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-300 transition flex items-center space-x-2 text-sm touch-target">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" /><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg>
+                        <span>Print All</span>
+                    </button>
+                </div>
+
+                <!-- Mock Case 1 (In Progress) -->
+                <div onclick="showForm('20251022-A')" class="bg-bg-card p-4 rounded-xl shadow-md flex justify-between items-center border border-border-subtle hover:border-accent-blue/50 touch-target transition cursor-pointer">
+                    <div>
+                        <p class="font-bold text-lg text-text-main font-mono">20251022-A</p>
+                        <p class="text-sm text-text-muted">Suresh Kumar, 45M</p>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <!-- Wording updated here -->
+                        <span class="text-sm font-semibold text-yellow-600">IN PROGRESS</span>
+                        <span class="text-xs text-text-muted">Last edited: 10:15 AM</span>
+                    </div>
+                </div>
+
+                <!-- Mock Case 2 (In Progress) -->
+                <div onclick="showForm('20251022-B')" class="bg-bg-card p-4 rounded-xl shadow-md flex justify-between items-center border border-border-subtle hover:border-accent-blue/50 touch-target transition cursor-pointer">
+                    <div>
+                        <p class="font-bold text-lg text-text-main font-mono">20251022-B</p>
+                        <p class="text-sm text-text-muted">Priya Sharma, 29F</p>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <!-- Wording updated here -->
+                        <span class="text-sm font-semibold text-yellow-600">IN PROGRESS</span>
+                        <span class="text-xs text-text-muted">Last edited: 03:20 PM</span>
+                    </div>
+                </div>
+
+                <!-- Mock Case 3 (Submitted) -->
+                <div class="bg-bg-card p-4 rounded-xl shadow-md flex justify-between items-center border border-border-subtle touch-target">
+                    <div class="flex-1">
+                        <p class="font-bold text-lg text-text-main font-mono">20251021-B</p>
+                        <p class="text-sm text-text-muted">Tan Wei Ling, 18F</p>
+                        <div class="mt-2">
+                           <!-- Wording updated here -->
+                           <span class="text-sm font-semibold text-accent-green bg-green-50 px-2 py-1 rounded-full border border-green-200">SUBMITTED</span>
+                           <span class="text-xs text-text-muted ml-2">Submitted: 21/10/2025, 09:30</span>
+                        </div>
+                    </div>
+                    <button onclick="generatePdfReport('20251021-B', this)" class="bg-accent-green text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-600 transition flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                          <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" />
+                          <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+                        </svg>
+                        <span>PDF</span>
+                    </button>
+                </div>
+
+                <!-- Mock Case 4 (Submitted) -->
+                <div class="bg-bg-card p-4 rounded-xl shadow-md flex justify-between items-center border border-border-subtle touch-target">
+                    <div class="flex-1">
+                        <p class="font-bold text-lg text-text-main font-mono">20251021-A</p>
+                        <p class="text-sm text-text-muted">Ahmad bin Ibrahim, 62M</p>
+                        <div class="mt-2">
+                           <!-- Wording updated here -->
+                           <span class="text-sm font-semibold text-accent-green bg-green-50 px-2 py-1 rounded-full border border-green-200">SUBMITTED</span>
+                           <span class="text-xs text-text-muted ml-2">Submitted: 21/10/2025, 11:45</span>
+                        </div>
+                    </div>
+                    <button onclick="generatePdfReport('20251021-A', this)" class="bg-accent-green text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-600 transition flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                          <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" />
+                          <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+                        </svg>
+                        <span>PDF</span>
+                    </button>
+                </div>
+
+                <!-- Mock Case 5 (Submitted) -->
+                 <div class="bg-bg-card p-4 rounded-xl shadow-md flex justify-between items-center border border-border-subtle touch-target">
+                    <div class="flex-1">
+                        <p class="font-bold text-lg text-text-main font-mono">20251019-C</p>
+                        <p class="text-sm text-text-muted">Lim Bee Choo, 78F</p>
+                        <div class="mt-2">
+                           <!-- Wording updated here -->
+                           <span class="text-sm font-semibold text-accent-green bg-green-50 px-2 py-1 rounded-full border border-green-200">SUBMITTED</span>
+                           <span class="text-xs text-text-muted ml-2">Submitted: 19/10/2025, 15:20</span>
+                        </div>
+                    </div>
+                    <button onclick="generatePdfReport('20251019-C', this)" class="bg-accent-green text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-green-600 transition flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                          <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" />
+                          <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+                        </svg>
+                        <span>PDF</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ---------------------------------------------------- -->
+        <!-- 2. CASE FORM VIEW (Split Screen)                     -->
+        <!-- ---------------------------------------------------- -->
+        <div id="form-view" class="hidden flex w-full h-full overflow-hidden">
+            <!-- Left Pane -->
+            <div id="section-nav" class="hidden md:block w-1/3 max-w-xs bg-bg-card p-4 sm:p-6 border-r border-border-subtle overflow-y-auto space-y-2"></div>
+            <!-- Right Pane -->
+            <div id="section-detail" class="flex-1 p-4 sm:p-6 overflow-y-auto bg-bg-main">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 id="section-detail-title" class="text-2xl font-bold text-text-main">Select a Section</h2>
+                    <p class="text-text-muted">Case ID: <span id="current-case-id-display" class="font-mono font-bold text-accent-red"></span></p>
+                </div>
+                <div id="section-content-container" class="bg-bg-card p-4 sm:p-6 rounded-xl border border-border-subtle min-h-full shadow-lg">
+                    <p class="text-text-muted">Use the navigation to begin documenting the case.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Fixed Footer for Form Actions -->
+    <footer id="form-footer" class="hidden bg-bg-card border-t border-border-subtle p-3 shadow-2xl flex justify-between items-center space-x-2 sm:space-x-4 flex-shrink-0 h-[4.25rem]">
+        <!-- Mobile Section Selector -->
+        <select id="mobile-section-select" onchange="displaySection(this.value)" class="md:hidden bg-bg-main text-text-main font-semibold p-2 rounded-lg touch-target flex-1 border border-border-subtle"></select>
+
+        <!-- This div wraps the buttons and the new error message -->
+        <div class="flex-1 flex justify-end items-center space-x-2 sm:space-x-4">
+            <!-- New Error Message -->
+            <p id="submit-error-message" class="text-xs text-accent-red font-medium hidden text-right pr-2">Please complete all mandatory sections (*).</p>
+
+            <button onclick="showHome()" class="text-text-main font-bold py-3 px-3 sm:px-6 rounded-lg shadow-md hover:bg-border-subtle transition touch-target border border-border-subtle text-sm sm:text-base">
+                <span class="hidden sm:inline">Exit and </span>Home
+            </button>
+            <button id="footer-save-draft" onclick="saveDraft()" class="bg-accent-blue text-white font-bold py-3 px-3 sm:px-6 rounded-lg shadow-md hover:bg-blue-600 transition touch-target text-sm sm:text-base">
+                Save Draft
+            </button>
+            <button id="footer-submit" onclick="openModal()" class="bg-accent-red text-white font-bold py-3 px-3 sm:px-6 rounded-lg shadow-md hover:bg-red-600 transition touch-target text-sm sm:text-base" disabled>
+                Submit Case
+            </button>
+        </div>
+    </footer>
+
+
+    <!-- Simple Modal for Submit Action -->
+    <div id="submit-modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden items-center justify-center z-50 p-4">
+        <div class="bg-bg-card p-8 rounded-xl shadow-2xl max-w-md w-full border border-accent-red text-text-main">
+            <h3 class="text-2xl font-bold mb-4 text-accent-red">Finalize Case?</h3>
+            <p class="text-base text-text-muted mb-6">Are you sure you want to finalize this case? The document will be locked and transmitted for review.</p>
+            <p class="text-sm text-text-muted mt-4 bg-gray-100 p-3 rounded-lg">
+                <strong class="text-accent-blue">Note:</strong> A PDF report will be generated and downloaded for your records upon finalization.
+            </p>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeModal()" class="bg-border-subtle text-text-main font-semibold px-4 py-3 rounded-lg hover:bg-gray-300 transition touch-target">Cancel</button>
+                <button onclick="finalizeCase()" class="bg-accent-red text-white font-semibold px-4 py-3 rounded-lg hover:bg-red-600 transition touch-target">Finalize & Gen. PDF</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Globals ---
+        let currentCaseId = '';
+        let activeSectionId = 'particulars';
+        let dailyCaseCounter = 1; // Tracks new cases for the current session/day.
+        let caseData = {}; // This will hold the *live* data for the currently edited case.
+
+        const mockDatabase = {
+            '20251022-A': {
+                particulars: {
+                    'input-date': '2025-10-22',
+                    'input-destination': 'Block 123, Ang Mo Kio Ave 4, #05-678',
+                    'input-crew-leader': 'LCP Desmond Chew',
+                    'input-casualty-name': 'Suresh Kumar',
+                    'input-sex': 'Male',
+                    'input-age': '45',
+                    'input-race': 'Indian'
+                },
+                'time-log': {
+                    'input-depart-time-hr': '10',
+                    'input-depart-time-min': '05',
+                    'input-arrive-ccp-time-hr': '10',
+                    'input-arrive-ccp-time-min': '15',
+                }
+            },
+            '20251022-B': {
+                particulars: {
+                    'input-date': '2025-10-22',
+                    'input-casualty-name': 'Priya Sharma',
+                    'input-sex': 'Female',
+                    'input-age': '29',
+                    'input-race': 'Indian'
+                }
+            }
+        };
+
+
+        // --- Homepage Logic ---
+        function generateNewCaseId() {
+            // Standardized Case Number: YYYYMMDD-Sequence
+            // We use a fixed date for this demo to ensure consistency.
+            const now = new Date('2025-10-22T18:19:00+08:00');
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+
+            // This demo assumes we are adding to the existing mock cases.
+            // A real app would check the database for the last sequence number for the day.
+            const suffix = String.fromCharCode(64 + 2 + dailyCaseCounter); // Start from C, after mock A and B
+            dailyCaseCounter++;
+            return `${year}${month}${day}-${suffix}`;
+        }
+
+        function generateBulkPdfReport() {
+            // In a real app, this would use a custom modal, not alert.
+            // For this demo, alert is used as a placeholder.
+            alert("This feature would generate a single PDF containing all case reports. This is for demonstration purposes only.");
+            console.log("Bulk PDF generation initiated.");
+        }
+
+
+        // --- PDF Generation Logic ---
+        async function generatePdfReport(caseId, triggerButton = null) {
+            if (!window.jspdf || !window.html2canvas) {
+                console.error("PDF generation libraries not loaded.");
+                alert("Could not generate PDF. Libraries not found."); // Placeholder for modal
+                return;
+            }
+
+            if (triggerButton) {
+                triggerButton.disabled = true;
+                triggerButton.innerHTML = `<span>Generating...</span>`;
+            }
+
+            // Create a temporary, off-screen container to render all sections for PDF capture
+            const reportContainer = document.createElement('div');
+            reportContainer.className = 'pdf-render-container';
+
+            // NOTE: In a real app, you would fetch the saved data for this 'caseId'
+            // and populate the form fields within this container.
+            // For this prototype, we'll just render the structure.
+            let reportHtml = `<h1 class="text-2xl font-bold">Case Report: ${caseId}</h1>`;
+            sections.forEach(section => {
+                reportHtml += `
+                    <div class="section-break">
+                        <h2 class="text-xl font-semibold mt-6">${section.title}</h2>
+                        <div class="section-content">${section.content}</div>
+                    </div>`;
+            });
+            reportContainer.innerHTML = reportHtml;
+            document.body.appendChild(reportContainer);
+
+            try {
+                const canvas = await html2canvas(reportContainer, { scale: 2 }); // Higher scale for better quality
+                const imgData = canvas.toDataURL('image/png');
+
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+
+                const imgProps = pdf.getImageProperties(imgData);
+                const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+                heightLeft -= pdfHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+                    heightLeft -= pdfHeight;
+                }
+
+                pdf.save(`HERO_Case_Report_${caseId}.pdf`);
+
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                alert("An error occurred while generating the PDF."); // Placeholder for modal
+            } finally {
+                // Clean up the temporary container
+                document.body.removeChild(reportContainer);
+                if (triggerButton) {
+                    // Restore button state
+                    triggerButton.disabled = false;
+                     triggerButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" /><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg><span>PDF</span>`;
+                }
+            }
+        }
+
+
+        // --- Shared Logic & Time Log ---
+        function _createTimeOptions(selectElement, max) {
+            if (!selectElement) return;
+            selectElement.innerHTML = ''; // Clear existing options
+             for (let i = 0; i <= max; i++) {
+                const option = document.createElement('option');
+                const value = String(i).padStart(2, '0');
+                option.value = value;
+                option.textContent = value;
+                selectElement.appendChild(option);
+            }
+        }
+
+        function setupTimeLogDropdowns() {
+            const timePrefixes = ['input-depart-time', 'input-arrive-ccp-time', 'input-arrive-ed-time', 'input-back-at-base-time'];
+            timePrefixes.forEach(prefix => {
+                const hrSelect = document.getElementById(`${prefix}-hr`);
+                const minSelect = document.getElementById(`${prefix}-min`);
+                _createTimeOptions(hrSelect, 23); // hours 0-23
+                _createTimeOptions(minSelect, 59); // minutes 0-59
+            });
+        }
+
+
+        // --- Vitals Logic (Section 6) ---
+        const vitalSignDefinitions = [
+            { id: 'temp', title: 'Temperature', unit: '°C', placeholder: '37.0', type: 'number', step: 0.1, min: 25, max: 45 },
+            { id: 'pulse', title: 'Pulse', unit: 'BPM', placeholder: '85', type: 'number', step: 1, min: 10, max: 300 },
+            { id: 'bp_s', title: 'BP Systolic', unit: 'mmHg', placeholder: '120', type: 'number', min: 40, max: 300 },
+            { id: 'bp_d', title: 'BP Diastolic', unit: 'mmHg', placeholder: '80', type: 'number', min: 20, max: 200 },
+            { id: 'spo2', title: 'SpO2', unit: '%', placeholder: '98', type: 'number', step: 1, min: 0, max: 100 },
+            { id: 'resp', title: 'Resp Rate', unit: 'BPM', placeholder: '16', type: 'number', step: 1, min: 0, max: 80 },
+            { id: 'pain', title: 'Pain Score', unit: '0-10', placeholder: '0', type: 'number', step: 1, min: 0, max: 10 }
+        ];
+
+        function confirmVitalsSet(setId) {
+            const setContainer = document.getElementById(setId);
+            if (!setContainer) return;
+
+            const inputs = setContainer.querySelectorAll('input');
+            inputs.forEach(input => {
+                input.setAttribute('disabled', 'true');
+            });
+
+            const confirmBtn = document.getElementById(`vitals-confirm-btn-${setId}`);
+            if (confirmBtn) {
+                confirmBtn.textContent = 'Confirmed';
+                confirmBtn.classList.remove('bg-accent-blue', 'hover:bg-blue-600');
+                confirmBtn.classList.add('bg-accent-green', 'cursor-default');
+                confirmBtn.setAttribute('disabled', 'true');
+            }
+        }
+
+        function generateVitalsSetHtml(data = null) {
+            const setId = data ? data.setId : 'vitals-set-' + Date.now();
+            const time = data ? data.time : new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // Format HH:MM for input type=time
+            let fieldsHtml = '';
+            let bpDone = false;
+
+            vitalSignDefinitions.forEach(vital => {
+                if (vital.id.startsWith('bp_')) {
+                    if (!bpDone) {
+                        const systolic = vitalSignDefinitions.find(v => v.id === 'bp_s');
+                        const diastolic = vitalSignDefinitions.find(v => v.id === 'bp_d');
+                        fieldsHtml += `
+                            <div class="col-span-1 sm:col-span-2">
+                                <label class="block text-sm font-medium text-text-muted">BP (Systolic/Diastolic) (${systolic.unit})</label>
+                                <div class="flex items-center mt-1 space-x-2">
+                                    <input type="${systolic.type}" id="${systolic.id}-${setId}" placeholder="${systolic.placeholder}" class="w-full touch-target text-center" min="${systolic.min}" max="${systolic.max}" value="${data?.[systolic.id] || ''}" ${data?.isConfirmed ? 'disabled' : ''}>
+                                    <span class="text-text-muted font-bold text-lg">/</span>
+                                    <input type="${diastolic.type}" id="${diastolic.id}-${setId}" placeholder="${diastolic.placeholder}" class="w-full touch-target text-center" min="${diastolic.min}" max="${diastolic.max}" value="${data?.[diastolic.id] || ''}" ${data?.isConfirmed ? 'disabled' : ''}>
+                                </div>
+                            </div>`;
+                        bpDone = true;
+                    }
+                } else {
+                     fieldsHtml += `
+                        <div class="col-span-1">
+                            <label for="${vital.id}-${setId}" class="block text-sm font-medium text-text-muted">${vital.title} (${vital.unit})</label>
+                            <input type="${vital.type}" id="${vital.id}-${setId}" placeholder="${vital.placeholder}"
+                                   ${vital.step ? `step="${vital.step}"` : ''}
+                                   ${vital.min ? `min="${vital.min}"` : ''}
+                                   ${vital.max ? `max="${vital.max}"` : ''}
+                                   class="w-full mt-1 touch-target" value="${data?.[vital.id] || ''}" ${data?.isConfirmed ? 'disabled' : ''}>
+                        </div>`;
+                }
+            });
+
+            const confirmButtonHtml = data?.isConfirmed
+                ? `<button id="vitals-confirm-btn-${setId}" class="w-full bg-accent-green text-white font-semibold py-2 rounded-lg cursor-default" disabled>Confirmed</button>`
+                : `<button onclick="confirmVitalsSet('${setId}')" id="vitals-confirm-btn-${setId}" class="w-full bg-accent-blue text-white font-semibold py-2 rounded-lg hover:bg-blue-600 transition touch-target">Confirm Vitals Set</button>`;
+
+            return `
+                <div id="${setId}" class="p-4 bg-bg-card rounded-xl border border-border-subtle shadow-lg space-y-3">
+                    <div class="flex justify-between items-center border-b border-border-subtle/50 pb-2">
+                         <div class="flex items-center space-x-2">
+                             <label for="vitals-time-${setId}" class="font-mono text-accent-blue text-sm font-semibold">Time:</label>
+                             <input type="time" id="vitals-time-${setId}" value="${time}" class="p-1 rounded-md border-gray-300 text-sm w-28 bg-white border" ${data?.isConfirmed ? 'disabled' : ''}>
+                         </div>
+                        <button onclick="document.getElementById('${setId}').remove()" class="text-accent-red hover:bg-red-50 p-1 rounded-full" aria-label="Remove Vitals Set">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${fieldsHtml}</div>
+                    <div class="pt-3">${confirmButtonHtml}</div>
+                </div>`;
+        }
+
+        function addVitalsSet() {
+            const listContainer = document.getElementById('vitals-tracking-container');
+            if (listContainer) {
+                listContainer.insertAdjacentHTML('afterbegin', generateVitalsSetHtml());
+            }
+        }
+
+        function setupVitalsSections() {
+            const container = document.getElementById('vitals-tracking-container');
+            if (!container) return;
+            container.innerHTML = '';
+            if (caseData.vitals && caseData.vitals.length > 0) {
+                caseData.vitals.forEach(vitalsSetData => {
+                    container.insertAdjacentHTML('beforeend', generateVitalsSetHtml(vitalsSetData));
+                });
+            } else {
+                addVitalsSet();
+            }
+        }
+
+
+        // --- GCS Logic (Section 4) ---
+        function generateGcsEntryHtml(data = null) {
+            const entryId = data ? data.entryId : 'gcs-entry-' + Date.now();
+            const time = data ? data.time : new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // Format HH:MM for input type=time
+
+            const isConfirmed = data ? data.isConfirmed : false;
+            const confirmButtonHtml = isConfirmed
+                ? `<button id="gcs-confirm-btn-${entryId}" class="w-full bg-accent-green text-white font-semibold py-2 rounded-lg cursor-default" disabled>Confirmed</button>`
+                : `<button onclick="confirmGcsReading('${entryId}')" id="gcs-confirm-btn-${entryId}" class="w-full bg-accent-red text-white font-semibold py-2 rounded-lg hover:bg-red-600 transition touch-target" disabled>Confirm Reading</button>`;
+
+            return `
+                <div id="${entryId}" class="gcs-entry-row p-4 bg-bg-card rounded-xl border border-border-subtle shadow-lg space-y-3">
+                    <div class="flex justify-between items-center border-b border-border-subtle/50 pb-2">
+                        <div class="flex items-center space-x-2">
+                             <label for="gcs-time-${entryId}" class="font-mono text-accent-blue text-sm font-semibold">Time:</label>
+                             <input type="time" id="gcs-time-${entryId}" value="${time}" class="p-1 rounded-md border-gray-300 text-sm w-28 bg-white border" ${isConfirmed ? 'disabled' : ''}>
+                         </div>
+                        <div class="flex items-center space-x-2">
+                             <span class="text-xl font-bold text-text-main">GCS: <span id="gcs-total-${entryId}" class="text-accent-red">—</span></span>
+                             <button onclick="deleteGcsEntry('${entryId}')" class="text-accent-red hover:bg-red-50 p-1 rounded-full" aria-label="Remove GCS Entry">
+                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
+                             </button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-text-muted text-center">E (1-4)</label>
+                            <input type="number" min="1" max="4" placeholder="1-4" id="gcs-e-${entryId}"
+                                   class="w-full touch-target text-center py-2 text-base gcs-input"
+                                   oninput="calculateGcs('${entryId}', this)" data-score="E" value="${data?.e || ''}" ${isConfirmed ? 'disabled' : ''}>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-text-muted text-center">V (1-5)</label>
+                            <input type="number" min="1" max="5" placeholder="1-5" id="gcs-v-${entryId}"
+                                   class="w-full touch-target text-center py-2 text-base gcs-input"
+                                   oninput="calculateGcs('${entryId}', this)" data-score="V" value="${data?.v || ''}" ${isConfirmed ? 'disabled' : ''}>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-text-muted text-center">M (1-6)</label>
+                            <input type="number" min="1" max="6" placeholder="1-6" id="gcs-m-${entryId}"
+                                   class="w-full touch-target text-center py-2 text-base gcs-input"
+                                   oninput="calculateGcs('${entryId}', this)" data-score="M" value="${data?.m || ''}" ${isConfirmed ? 'disabled' : ''}>
+                        </div>
+                    </div>
+                    <div class="pt-3" id="gcs-confirm-area-${entryId}">${confirmButtonHtml}</div>
+                </div>`;
+        }
+
+        function addGcsEntry() {
+            const listContainer = document.getElementById(`gcs-tracking-container`);
+            if (listContainer) {
+                listContainer.insertAdjacentHTML('afterbegin', generateGcsEntryHtml());
+                const newEntryId = listContainer.querySelector('.gcs-entry-row').id;
+                document.getElementById(`gcs-e-${newEntryId}`).focus();
+            }
+        }
+
+        function setupGcsSection() {
+            const container = document.getElementById('gcs-tracking-container');
+            if (!container) return;
+            container.innerHTML = '';
+            if (caseData.gcs && caseData.gcs.length > 0) {
+                caseData.gcs.forEach(gcsEntryData => {
+                    container.insertAdjacentHTML('beforeend', generateGcsEntryHtml(gcsEntryData));
+                    calculateGcs(gcsEntryData.entryId); // Recalculate total and button state
+                });
+            } else {
+                addGcsEntry();
+            }
+        }
+
+        function deleteGcsEntry(entryId) {
+            const entryElement = document.getElementById(entryId);
+            if (entryElement) {
+                entryElement.remove();
+            }
+        }
+
+        function calculateGcs(entryId, currentInput) {
+            const eInput = document.getElementById(`gcs-e-${entryId}`);
+            const vInput = document.getElementById(`gcs-v-${entryId}`);
+            const mInput = document.getElementById(`gcs-m-${entryId}`);
+            const totalSpan = document.getElementById(`gcs-total-${entryId}`);
+            const confirmBtn = document.getElementById(`gcs-confirm-btn-${entryId}`);
+
+            if (!eInput || !vInput || !mInput || !totalSpan) return;
+
+            const validateInput = (input) => {
+                const value = parseInt(input.value);
+                const min = parseInt(input.min);
+                const max = parseInt(input.max);
+                if (input.value === '' || (value >= min && value <= max)) {
+                    input.classList.remove('invalid'); return true;
+                } else {
+                    input.classList.add('invalid'); return false;
+                }
+            };
+
+            const isEValid = validateInput(eInput);
+            const isVValid = validateInput(vInput);
+            const isMValid = validateInput(mInput);
+
+            if (isEValid && isVValid && isMValid && eInput.value !== '' && vInput.value !== '' && mInput.value !== '') {
+                const total = parseInt(eInput.value) + parseInt(vInput.value) + parseInt(mInput.value);
+                totalSpan.textContent = total;
+                totalSpan.classList.remove('text-accent-red');
+                totalSpan.classList.add('text-accent-blue');
+                if(confirmBtn && !confirmBtn.textContent.includes('Confirmed')) confirmBtn.removeAttribute('disabled');
+            } else {
+                totalSpan.textContent = "—";
+                totalSpan.classList.remove('text-accent-blue');
+                totalSpan.classList.add('text-accent-red');
+                if(confirmBtn) confirmBtn.setAttribute('disabled', 'true');
+            }
+
+            if (currentInput) {
+                const value = currentInput.value;
+                const max = parseInt(currentInput.max);
+                if (value.length === 1 && parseInt(value) >= 1 && parseInt(value) <= max) {
+                     if (currentInput === eInput) vInput.focus();
+                     else if (currentInput === vInput) mInput.focus();
+                     else if (currentInput === mInput && confirmBtn && !confirmBtn.disabled) confirmBtn.focus();
+                }
+            }
+        }
+
+        function confirmGcsReading(entryId) {
+            calculateGcs(entryId);
+            const confirmBtn = document.getElementById(`gcs-confirm-btn-${entryId}`);
+            if (confirmBtn.hasAttribute('disabled')) return;
+
+            document.getElementById(`gcs-e-${entryId}`).setAttribute('disabled', 'true');
+            document.getElementById(`gcs-v-${entryId}`).setAttribute('disabled', 'true');
+            document.getElementById(`gcs-m-${entryId}`).setAttribute('disabled', 'true');
+            document.getElementById(`gcs-time-${entryId}`).setAttribute('disabled', 'true');
+
+            confirmBtn.textContent = 'Confirmed';
+            confirmBtn.classList.remove('bg-accent-red', 'hover:bg-red-600');
+            confirmBtn.classList.add('bg-accent-green', 'cursor-default');
+            confirmBtn.setAttribute('disabled', 'true');
+        }
+
+        // --- Pupils Logic (Section 5) ---
+        function togglePupilDetails(value) {
+            const container = document.getElementById('pupil-details-container');
+            if (container) {
+                container.classList.toggle('hidden', value !== 'No');
+                const textareas = container.querySelectorAll('textarea');
+                textareas.forEach(textarea => {
+                    textarea.disabled = (value !== 'No');
+                    if (value === 'Yes') textarea.value = '';
+                });
+            }
+        }
+
+        // --- History Logic (Section 7) ---
+        function toggleHistorySpecify(value, containerId) {
+            const container = document.getElementById(containerId);
+            if (container) {
+                const isYes = (value === 'Yes');
+                container.classList.toggle('hidden', !isYes);
+                const textarea = container.querySelector('textarea');
+                if (textarea) {
+                    textarea.disabled = !isYes;
+                    if (!isYes) {
+                        textarea.value = '';
+                        // Also clear from caseData
+                        if (caseData.history && caseData.history[textarea.id]) {
+                            caseData.history[textarea.id] = '';
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- ECG Logic (Section 8) ---
+        function toggleEcgRhythm(value) {
+            const container = document.getElementById('ecg-rhythm-container');
+             if (container) {
+                const isYes = (value === 'Yes');
+                container.classList.toggle('hidden', !isYes);
+                const select = container.querySelector('select');
+                 if(select){
+                    select.disabled = !isYes;
+                    if(!isYes){
+                        select.value = '';
+                         // Also clear from caseData
+                         if (caseData['ecg-glucose'] && caseData['ecg-glucose'][select.id]) {
+                            caseData['ecg-glucose'][select.id] = '';
+                        }
+                    }
+                 }
+            }
+        }
+
+        function toggleCirculationType(value) {
+            const container = document.getElementById('circulation-type-container');
+            if (container) {
+                container.classList.toggle('hidden', value !== 'present');
+                if (value !== 'present') {
+                    container.querySelector('select').value = '';
+                }
+            }
+        }
+
+        function toggleBreathingType(value) {
+            const container = document.getElementById('breathing-type-container');
+            if (container) {
+                container.classList.toggle('hidden', value !== 'present');
+                if (value !== 'present') {
+                    const specifyContainer = document.getElementById('breathing-specify-container');
+                    if (specifyContainer) specifyContainer.classList.add('hidden');
+                    container.querySelector('select').value = '';
+                }
+            }
+        }
+
+        function toggleBreathingSpecify(value) {
+            const container = document.getElementById('breathing-specify-container');
+            if (container) {
+                container.classList.toggle('hidden', value !== 'others');
+                const input = container.querySelector('input');
+                if (input) {
+                    input.disabled = (value !== 'others');
+                    if (value !== 'others') input.value = '';
+                }
+            }
+        }
+
+        function toggleCSpineSpecify(selectElement) {
+            const container = document.getElementById('cspine-specify-container');
+            if (container) {
+                container.classList.toggle('hidden', selectElement.value !== 'Yes');
+                const input = container.querySelector('input');
+                if (input) {
+                    input.disabled = (selectElement.value !== 'Yes');
+                     if (selectElement.value === 'No') input.value = '';
+                }
+            }
+        }
+
+
+        // --- Form Section Content and Definitions ---
+        // Renumbered subsequent sections
+        const sections = [
+            { id: 'particulars', title: '1. Particulars', mandatory: true, content: `
+                <div class="space-y-6">
+                    <div><label class="block text-sm font-medium mb-1 text-text-muted">CSN <span class="text-accent-red">*</span></label><input type="text" id="csn-input" value="" readonly class="w-full touch-target opacity-70 bg-bg-main text-accent-red font-bold" data-mandatory="true" data-field-name="CSN"><p class="text-xs text-text-muted mt-1">Case Serial Number - automatically generated.</p></div>
+                    <div><label class="block text-sm font-medium mb-1 text-text-muted">Date <span class="text-accent-red">*</span></label><div class="flex space-x-2"><input type="date" id="input-date" required class="flex-1 touch-target" data-mandatory="true" data-field-name="Date"><button onclick="setCurrentDate()" class="bg-accent-blue text-white text-sm font-semibold px-4 py-3 rounded-lg hover:bg-blue-600 transition touch-target">Set Current</button></div></div>
+                    <div><label class="block text-sm font-medium mb-1 text-text-muted">EAS Base</label><input type="text" id="input-eas-base" class="w-full touch-target"></div>
+                    <div><label class="block text-sm font-medium mb-1 text-text-muted">Casualty Location <span class="text-accent-red">*</span></label><input type="text" id="input-destination" required class="w-full touch-target" data-mandatory="true" data-field-name="Casualty Location"></div>
+                    <div><label class="block text-sm font-medium mb-1 text-text-muted">Crew Leader <span class="text-accent-red">*</span></label><input type="text" id="input-crew-leader" required class="w-full touch-target" data-mandatory="true" data-field-name="Crew Leader"></div>
+                    <div><label class="block text-sm font-medium mb-1 text-text-muted">Rank/Name of Casualty <span class="text-accent-red">*</span></label><input type="text" id="input-casualty-name" required class="w-full touch-target" data-mandatory="true" data-field-name="Casualty Name"></div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div><label class="block text-sm font-medium mb-1 text-text-muted">Sex <span class="text-accent-red">*</span></label><select id="input-sex" required class="w-full touch-target" data-mandatory="true" data-field-name="Sex"><option value="" disabled selected>Select Sex</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+                        <div><label class="block text-sm font-medium mb-1 text-text-muted">Age (Y) <span class="text-accent-red">*</span></label><input type="number" id="input-age" min="0" required class="w-full touch-target" data-mandatory="true" data-field-name="Age"></div>
+                    </div>
+                    <div><label class="block text-sm font-medium mb-1 text-text-muted">Race <span class="text-accent-red">*</span></label><select id="input-race" required class="w-full touch-target" data-mandatory="true" data-field-name="Race"><option value="" disabled selected>Select Race</option><option value="Chinese">Chinese</option><option value="Malay">Malay</option><option value="Indian">Indian</option><option value="Others">Others</option></select></div>
+                    <p class="text-sm text-accent-red font-medium mt-6">* Indicates a mandatory field.</p>
+                </div>` },
+            { id: 'time-log', title: '2. Time Log', mandatory: true, content: `<div class="space-y-6 mb-8"><h4 class="text-lg font-semibold text-text-main border-b border-border-subtle pb-2">Operational Milestones (HH:MM)</h4>
+                <div><label class="block text-sm font-medium mb-1 text-text-muted">Depart Time</label><div class="flex space-x-2"><div class="flex-1 grid grid-cols-2 gap-2"><select id="input-depart-time-hr" class="touch-target w-full"></select><select id="input-depart-time-min" class="touch-target w-full"></select></div><button onclick="setCurrentTime('input-depart-time')" class="bg-accent-green text-white text-sm font-semibold px-4 py-3 rounded-lg hover:bg-green-600 transition touch-target">Set Current</button></div></div>
+                <div><label class="block text-sm font-medium mb-1 text-text-muted">Arrive CCP Time</label><div class="flex space-x-2"><div class="flex-1 grid grid-cols-2 gap-2"><select id="input-arrive-ccp-time-hr" class="touch-target w-full"></select><select id="input-arrive-ccp-time-min" class="touch-target w-full"></select></div><button onclick="setCurrentTime('input-arrive-ccp-time')" class="bg-accent-green text-white text-sm font-semibold px-4 py-3 rounded-lg hover:bg-green-600 transition touch-target">Set Current</button></div></div>
+                <div><label class="block text-sm font-medium mb-1 text-text-muted">Arrive Next echelon/ED Time</label><div class="flex space-x-2"><div class="flex-1 grid grid-cols-2 gap-2"><select id="input-arrive-ed-time-hr" class="touch-target w-full"></select><select id="input-arrive-ed-time-min" class="touch-target w-full"></select></div><button onclick="setCurrentTime('input-arrive-ed-time')" class="bg-accent-green text-white text-sm font-semibold px-4 py-3 rounded-lg hover:bg-green-600 transition touch-target">Set Current</button></div></div>
+                <div><label class="block text-sm font-medium mb-1 text-text-muted">Time Back at Base</label><div class="flex space-x-2"><div class="flex-1 grid grid-cols-2 gap-2"><select id="input-back-at-base-time-hr" class="touch-target w-full"></select><select id="input-back-at-base-time-min" class="touch-target w-full"></select></div><button onclick="setCurrentTime('input-back-at-base-time')" class="bg-accent-green text-white text-sm font-semibold px-4 py-3 rounded-lg hover:bg-green-600 transition touch-target">Set Current</button></div></div>
+            </div>` },
+            { id: 'initial-assessment', title: '3. Initial Assessment', mandatory: true, content: `<div class="space-y-6"><div><label class="block text-sm font-medium mb-1 text-text-muted">AVPU</label><select id="input-avpu" class="w-full touch-target"><option value="" disabled selected>Select Status</option><option value="Alert">Alert</option><option value="Verbal">Verbal</option><option value="Pain">Pain</option><option value="Unresponsive">Unresponsive</option></select></div><div><label class="block text-sm font-medium mb-1 text-text-muted">D - Cervical Spine Injury</label><select id="input-cspine" onchange="toggleCSpineSpecify(this)" class="w-full touch-target"><option value="" disabled selected>Select Option</option><option value="Yes">Yes</option><option value="No">No</option></select></div><div id="cspine-specify-container" class="hidden pl-4 border-l-4 border-accent-red/50"><label class="block text-sm font-medium mb-1 text-text-muted">If Yes, then specify</label><input id="input-cspine-specify" type="text" placeholder="e.g., Pain on palpation C5-C6" class="w-full touch-target"></div><div><label class="block text-sm font-medium mb-1 text-text-muted">A - Airway</label><select id="input-airway" class="w-full touch-target"><option value="" disabled selected>Select Airway Status</option><option value="patent">Patent</option><option value="not patent">Not Patent</option></select></div><div><label class="block text-sm font-medium mb-1 text-text-muted">B - Breathing</label><select id="input-breathing" onchange="toggleBreathingType(this.value)" class="w-full touch-target"><option value="" disabled selected>Select Breathing Status</option><option value="present">Present</option><option value="absent">Absent</option></select></div><div id="breathing-type-container" class="hidden pl-4 border-l-4 border-accent-blue/50 space-y-4"><label class="block text-sm font-medium mb-1 text-text-muted">Breathing Type</label><select id="input-breathing-type" onchange="toggleBreathingSpecify(this.value)" class="w-full touch-target"><option value="" disabled selected>Select Breathing Type</option><option value="Nasal flaring">Nasal flaring</option><option value="Tracheal tugging">Tracheal tugging</option><option value="pursed lips">Pursed lips</option><option value="use of accessory muscles">Use of accessory muscles</option><option value="normal">Normal</option><option value="tachypnea">Tachypnea</option><option value="bradypnea">Bradypnea</option><option value="others">Others</option></select><div id="breathing-specify-container" class="hidden"><label class="block text-sm font-medium mb-1 text-text-muted">If Others, then specify</label><input id="input-breathing-specify" type="text" placeholder="Specify breathing type..." class="w-full touch-target"></div></div><div><label class="block text-sm font-medium mb-1 text-text-muted">C - Circulation</label><p class="text-xs text-text-muted mb-1">(Refers to Pulse)</p><select id="input-circulation" onchange="toggleCirculationType(this.value)" class="w-full touch-target"><option value="" disabled selected>Select Circulation Status</option><option value="present">Present</option><option value="absent">Absent</option></select></div><div id="circulation-type-container" class="hidden pl-4 border-l-4 border-accent-blue/50"><label class="block text-sm font-medium mb-1 text-text-muted">Carotid or Radial</label><select id="input-circulation-type" class="w-full touch-target"><option value="" disabled selected>Select Type</option><option value="Carotid">Carotid</option><option value="Radial">Radial</option></select></div></div>` },
+            { id: 'gcs', title: '4. Glasgow Coma Scale', mandatory: true, content: `<h4 class="text-lg font-semibold text-text-main border-b border-border-subtle pb-2 mb-4">Serial GCS Monitoring</h4><button onclick="addGcsEntry()" class="w-full bg-accent-blue/10 text-accent-blue text-sm font-semibold py-2 rounded-lg hover:bg-accent-blue/20 transition touch-target mb-6 border border-accent-blue/30">+ Add New GCS Reading</button><div class="space-y-4" id="gcs-tracking-container"></div>` },
+            { id: 'pupils', title: '5. Pupils', mandatory: true, content: `<div class="space-y-6"><div><label class="block text-sm font-medium mb-2 text-text-muted">Are the pupils size equal and reactive to light?</label><select id="input-pupil-reactive" onchange="togglePupilDetails(this.value)" class="w-full touch-target"><option value="" selected disabled>Select Status</option><option value="Yes">Yes</option><option value="No">No</option></select></div><div id="pupil-details-container" class="hidden space-y-4"><p class="text-sm font-medium text-text-muted">If No, then state:</p><div class="grid grid-cols-2 gap-4"><div class="space-y-1"><label for="input-pupil-left" class="block text-sm font-medium text-text-muted">Left Eye</label><textarea id="input-pupil-left" rows="3" placeholder="e.g., sluggish (4mm)" class="w-full touch-target"></textarea></div><div class="space-y-1"><label for="input-pupil-right" class="block text-sm font-medium text-text-muted">Right Eye</label><textarea id="input-pupil-right" rows="3" placeholder="e.g., fixed and dilated (8mm)" class="w-full touch-target"></textarea></div></div></div></div>` },
+            { id: 'vitals', title: '6. Vital Signs', mandatory: true, content: `<div class="space-y-4">
+                            <h4 class="text-lg font-semibold text-text-main border-b border-border-subtle pb-2">Vitals Monitoring</h4>
+                            <button onclick="addVitalsSet()" class="w-full bg-accent-blue/10 text-accent-blue text-sm font-semibold py-3 rounded-lg hover:bg-accent-blue/20 transition touch-target border border-accent-blue/30">
+                                + Add New Vitals Set
+                            </button>
+                            <div id="vitals-tracking-container" class="space-y-6 mt-4">
+                                <!-- Vitals sets will be dynamically inserted here -->
+                            </div>
+                        </div>` },
+            { id: 'history', title: '7. History Taking', mandatory: true, content: `
+                <div class="space-y-6">
+                    <!-- Medications -->
+                    <div>
+                        <label for="input-history-meds-select" class="block text-sm font-medium mb-1 text-text-muted">Medications (Existing) <span class="text-accent-red">*</span></label>
+                        <select id="input-history-meds-select" class="w-full touch-target" onchange="toggleHistorySpecify(this.value, 'history-meds-specify-container')">
+                            <option value="" selected disabled>Select Option</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="Unsure">Unsure</option>
+                        </select>
+                    </div>
+                    <div id="history-meds-specify-container" class="hidden pl-4 border-l-4 border-accent-blue/50 space-y-2">
+                        <label for="input-history-meds-specify" class="block text-sm font-medium text-text-muted">If yes, specify:</label>
+                        <textarea id="input-history-meds-specify" rows="2" placeholder="List current medications..." class="w-full touch-target"></textarea>
+                    </div>
+
+                    <!-- Allergies -->
+                    <div>
+                        <label for="input-history-allergies-select" class="block text-sm font-medium mb-1 text-text-muted">Allergies <span class="text-accent-red">*</span></label>
+                        <select id="input-history-allergies-select" class="w-full touch-target" onchange="toggleHistorySpecify(this.value, 'history-allergies-specify-container')">
+                            <option value="" selected disabled>Select Option</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="Unsure">Unsure</option>
+                        </select>
+                    </div>
+                    <div id="history-allergies-specify-container" class="hidden pl-4 border-l-4 border-accent-blue/50 space-y-2">
+                        <label for="input-history-allergies-specify" class="block text-sm font-medium text-text-muted">If yes, specify:</label>
+                        <textarea id="input-history-allergies-specify" rows="2" placeholder="e.g., Penicillin (rash), Peanuts (anaphylaxis)" class="w-full touch-target"></textarea>
+                    </div>
+
+                    <!-- Past Medical History -->
+                    <div>
+                        <label for="input-history-pmh-select" class="block text-sm font-medium mb-1 text-text-muted">Past Medical History <span class="text-accent-red">*</span></label>
+                        <select id="input-history-pmh-select" class="w-full touch-target" onchange="toggleHistorySpecify(this.value, 'history-pmh-specify-container')">
+                            <option value="" selected disabled>Select Option</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="Unsure">Unsure</option>
+                        </select>
+                    </div>
+                    <div id="history-pmh-specify-container" class="hidden pl-4 border-l-4 border-accent-blue/50 space-y-2">
+                        <label for="input-history-pmh-specify" class="block text-sm font-medium text-text-muted">If yes, specify:</label>
+                        <textarea id="input-history-pmh-specify" rows="3" placeholder="e.g., Hypertension, Diabetes Type 2" class="w-full touch-target"></textarea>
+                    </div>
+
+                    <p class="text-sm text-accent-red font-medium mt-6">* Indicates a mandatory field (selection required).</p>
+                </div>
+            ` },
+            // NEW Section 8: ECG & Glucose
+            { id: 'ecg-glucose', title: '8. ECG & Glucose', content: `
+                <div class="space-y-6">
+                    <!-- ECG -->
+                    <div>
+                        <label for="input-ecg" class="block text-sm font-medium mb-1 text-text-muted">ECG</label>
+                        <select id="input-ecg" class="w-full touch-target" onchange="toggleEcgRhythm(this.value)">
+                            <option value="" selected disabled>Select Option</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                    <div id="ecg-rhythm-container" class="hidden pl-4 border-l-4 border-accent-blue/50 space-y-2">
+                        <label for="input-ecg-rhythm" class="block text-sm font-medium text-text-muted">Rhythm</label>
+                        <select id="input-ecg-rhythm" class="w-full touch-target">
+                            <option value="" selected disabled>Select Rhythm</option>
+                            <option value="VF">VF</option>
+                            <option value="VT">VT</option>
+                            <option value="Asystole">Asystole</option>
+                            <option value="PEA">PEA</option>
+                            <option value="NSR">NSR</option>
+                            <option value="ST">ST</option>
+                            <option value="SB">SB</option>
+                            <option value="Others">Others</option>
+                        </select>
+                    </div>
+
+                    <!-- Glucose -->
+                    <div class="mt-6 pt-6 border-t border-border-subtle">
+                         <label class="block text-sm font-medium text-text-muted">Glucose Readings</label>
+                         <p id="glucose-mandatory-helper" class="text-xs text-accent-red mt-1 mb-2 hidden">(First reading is mandatory due to AVPU status)</p>
+                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label for="input-glucose-1st" class="block text-xs font-medium text-text-muted mb-1">1st Reading <span id="glucose-1st-mandatory-indicator" class="dynamic-mandatory-indicator hidden">*</span></label>
+                                <input type="text" id="input-glucose-1st" placeholder="e.g., 5.6 mmol/L" class="w-full touch-target">
+                            </div>
+                             <div>
+                                <label for="input-glucose-2nd" class="block text-xs font-medium text-text-muted mb-1">2nd Reading</label>
+                                <input type="text" id="input-glucose-2nd" placeholder="e.g., 5.8 mmol/L" class="w-full touch-target">
+                            </div>
+                             <div>
+                                <label for="input-glucose-3rd" class="block text-xs font-medium text-text-muted mb-1">3rd Reading</label>
+                                <input type="text" id="input-glucose-3rd" placeholder="e.g., 5.5 mmol/L" class="w-full touch-target">
+                            </div>
+                         </div>
+                    </div>
+                </div>
+            ` },
+            // Renumbered sections
+            { id: 'management', title: '9. Management', content: `<label class="block text-sm font-medium mb-4 text-text-muted">Interventions Performed</label><div class="grid grid-cols-2 gap-4 mb-6"><label class="flex items-center bg-bg-main p-3 rounded-lg border border-border-subtle hover:border-accent-blue/50 transition cursor-pointer shadow-sm"><input id="input-mgmt-iv" type="checkbox" class="h-5 w-5 text-accent-blue rounded mr-3 bg-bg-main border-gray-400"> IV Access</label><label class="flex items-center bg-bg-main p-3 rounded-lg border border-border-subtle hover:border-accent-blue/50 transition cursor-pointer shadow-sm"><input id="input-mgmt-airway" type="checkbox" class="h-5 w-5 text-accent-blue rounded mr-3 bg-bg-main border-gray-400"> Airway Adjunct</label></div><div class="mt-4"><label class="block text-sm font-medium mb-1 text-text-muted">Drug Administered</label><input id="input-mgmt-drug" type="text" placeholder="e.g., Aspirin 300mg PO" class="w-full touch-target"></div>` },
+            { id: 'clinical-notes', title: '10. Clinical notes', content: `<textarea id="input-notes" rows="10" placeholder="Document patient presentation, observations, and detailed response to treatment..." class="w-full touch-target"></textarea>` },
+            { id: 'outcome', title: '11. Outcome', content: `<div class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-text-muted">Arrive at Next Echelon</label>
+                            <select id="input-outcome-echelon" class="w-full touch-target" onchange="toggleOutcomeDetails(this.value)">
+                                <option value="" selected disabled>Select Option</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                            </select>
+                        </div>
+                        <!-- This container will be shown conditionally -->
+                        <div id="outcome-details-container" class="hidden space-y-6 pl-4 border-l-4 border-accent-blue/50 pt-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-text-muted">Location <span class="text-accent-red">*</span></label>
+                                <input type="text" id="input-outcome-location" class="w-full touch-target" placeholder="e.g., National University Hospital (NUH)" data-mandatory-outcome="true">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-text-muted">HOTO Date/Time (DD-MM-YYY HH:MM) <span class="text-accent-red">*</span></label>
+                                <div class="flex space-x-2">
+                                    <input type="text" id="input-outcome-hoto" class="flex-1 touch-target" placeholder="DD-MM-YYY HH:MM" data-mandatory-outcome="true">
+                                    <button onclick="setCurrentDateTime('input-outcome-hoto')" class="bg-accent-green text-white text-sm font-semibold px-4 py-3 rounded-lg hover:bg-green-600 transition touch-target">Set Current</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-text-muted">Received by <span class="text-accent-red">*</span></label>
+                                <input type="text" id="input-outcome-received-by" class="w-full touch-target" placeholder="SGT Stephanie Ting" data-mandatory-outcome="true">
+                            </div>
+                            <p class="text-sm text-accent-red font-medium">* Indicates a mandatory field if "Arrive at Next Echelon" is "Yes".</p>
+                        </div>
+                </div>` }
+        ];
+
+        // --- Core Application Logic ---
+
+        function updateHeader(view, caseId = '') {
+            const headerCenter = document.getElementById('header-center');
+            headerCenter.textContent = (view === 'home') ? '' : `CASE ID: ${caseId}`; // Removed 'MedAssist Dashboard'
+            if (view === 'form') {
+                 document.getElementById('current-case-id-display').textContent = caseId;
+            }
+        }
+
+        function showHome() {
+            document.getElementById('home-view').classList.remove('hidden');
+            document.getElementById('form-view').classList.add('hidden');
+            document.getElementById('form-footer').classList.add('hidden');
+            updateHeader('home');
+        }
+
+        function showForm(caseId) {
+            currentCaseId = caseId;
+            // Load data from our "database", clone it to avoid modifying the original mock.
+            caseData = JSON.parse(JSON.stringify(mockDatabase[caseId] || {}));
+
+            document.getElementById('home-view').classList.add('hidden');
+            document.getElementById('form-view').classList.remove('hidden');
+            document.getElementById('form-view').classList.add('flex');
+            document.getElementById('form-footer').classList.remove('hidden');
+            renderSectionNav();
+            displaySection('particulars'); // Load first section
+            updateHeader('form', caseId);
+            // checkMandatoryFields(); // This is called inside displaySection
+        }
+
+        function renderSectionNav() {
+            const nav = document.getElementById('section-nav');
+            const mobileSelect = document.getElementById('mobile-section-select');
+            nav.innerHTML = '<h3 class="text-xl font-semibold text-accent-blue mb-4">Case Sections</h3>';
+            mobileSelect.innerHTML = '';
+            sections.forEach(section => {
+                const mandatoryIndicator = section.mandatory ? '<span class="text-accent-red ml-1">*</span>' : '';
+
+                const btn = document.createElement('button');
+                btn.id = `nav-btn-${section.id}`;
+                btn.className = 'w-full text-left p-4 rounded-lg font-semibold text-text-main hover:bg-border-subtle touch-target transition focus:outline-none';
+                btn.innerHTML = section.title + mandatoryIndicator; // Add indicator
+                btn.onclick = () => displaySection(section.id);
+                nav.appendChild(btn);
+
+                const option = document.createElement('option');
+                option.value = section.id;
+                // Add indicator (text-only) and remove any HTML from title
+                option.textContent = section.title.replace(/<[^>]*>?/gm, '') + (section.mandatory ? ' *' : '');
+                mobileSelect.appendChild(option);
+            });
+        }
+
+        function runConditionalLogic(sectionId) {
+            const contentContainer = document.getElementById('section-content-container');
+            if (!contentContainer) return;
+
+            // Manually trigger the logic for any conditional fields in the current section
+            switch(sectionId) {
+                case 'initial-assessment':
+                    let select;
+                    select = contentContainer.querySelector('select[onchange*="toggleCSpineSpecify"]');
+                    if (select) toggleCSpineSpecify(select);
+
+                    select = contentContainer.querySelector('select[onchange*="toggleBreathingType"]');
+                    if (select) toggleBreathingType(select.value);
+
+                    select = contentContainer.querySelector('select[onchange*="toggleBreathingSpecify"]');
+                    if (select) toggleBreathingSpecify(select.value);
+
+                    select = contentContainer.querySelector('select[onchange*="toggleCirculationType"]');
+                    if (select) toggleCirculationType(select.value);
+                    break;
+                case 'pupils':
+                    const pupilSelect = contentContainer.querySelector('#input-pupil-reactive');
+                    if (pupilSelect) togglePupilDetails(pupilSelect.value);
+                    break;
+                case 'history':
+                    let historySelect;
+                    historySelect = contentContainer.querySelector('#input-history-meds-select');
+                    if (historySelect) toggleHistorySpecify(historySelect.value, 'history-meds-specify-container');
+
+                    historySelect = contentContainer.querySelector('#input-history-allergies-select');
+                    if (historySelect) toggleHistorySpecify(historySelect.value, 'history-allergies-specify-container');
+
+                    historySelect = contentContainer.querySelector('#input-history-pmh-select');
+                    if (historySelect) toggleHistorySpecify(historySelect.value, 'history-pmh-specify-container');
+                    break;
+                case 'ecg-glucose': // New case
+                    const ecgSelect = contentContainer.querySelector('#input-ecg');
+                    if (ecgSelect) toggleEcgRhythm(ecgSelect.value);
+                     // Check and update glucose mandatory indicator
+                    updateGlucoseMandatoryUI();
+                    break;
+                case 'outcome':
+                    const outcomeSelect = contentContainer.querySelector('#input-outcome-echelon');
+                    if (outcomeSelect) toggleOutcomeDetails(outcomeSelect.value);
+                    break;
+            }
+        }
+
+        // --- NEW Helper to update Glucose mandatory UI ---
+        function updateGlucoseMandatoryUI() {
+            const avpuValue = caseData['initial-assessment']?.['input-avpu'];
+            const needsGlucose = ['Verbal', 'Pain', 'Unresponsive'].includes(avpuValue);
+
+            const indicator = document.getElementById('glucose-1st-mandatory-indicator');
+            const helperText = document.getElementById('glucose-mandatory-helper');
+
+            if (indicator) {
+                indicator.classList.toggle('hidden', !needsGlucose);
+            }
+            if(helperText){
+                 helperText.classList.toggle('hidden', !needsGlucose);
+            }
+        }
+
+
+        function displaySection(id) {
+            // Save data from the previous section before switching
+            saveActiveSectionData();
+
+            const section = sections.find(s => s.id === id);
+            if (!section) return;
+            activeSectionId = id;
+
+            document.getElementById('section-detail-title').textContent = section.title;
+            const contentContainer = document.getElementById('section-content-container');
+            contentContainer.innerHTML = section.content;
+
+            if (id === 'particulars' && currentCaseId) {
+                const csnInput = document.getElementById('csn-input');
+                if (csnInput) csnInput.value = currentCaseId;
+            }
+
+            // --- Restore data for SIMPLE sections---
+            if (caseData[id]) {
+                Object.keys(caseData[id]).forEach(elementId => {
+                    const element = document.getElementById(elementId);
+                    if (element) {
+                        if (element.type === 'checkbox') {
+                            element.checked = caseData[id][elementId];
+                        } else {
+                            element.value = caseData[id][elementId];
+                        }
+                    }
+                });
+            }
+
+            document.querySelectorAll('#section-nav button').forEach(btn => {
+                btn.classList.toggle('bg-accent-blue', btn.id === `nav-btn-${id}`);
+                btn.classList.toggle('text-white', btn.id === `nav-btn-${id}`);
+            });
+            document.getElementById('mobile-section-select').value = id;
+
+            // --- Run setup functions AFTER restoring data ---
+            if (id === 'vitals') setupVitalsSections();
+            else if (id === 'gcs') setupGcsSection();
+            else if (id === 'time-log') {
+                setupTimeLogDropdowns();
+                // Restore time log data which is also a simple key-value pair
+                if(caseData[id]) {
+                    Object.keys(caseData[id]).forEach(elementId => {
+                        const element = document.getElementById(elementId);
+                        if (element) element.value = caseData[id][elementId];
+                    });
+                }
+            }
+
+            // --- Re-run conditional UI logic to match restored data ---
+            runConditionalLogic(id);
+
+            checkMandatoryFields();
+        }
+
+        function checkMandatoryFields() {
+            const submitBtn = document.getElementById('footer-submit');
+            const errorMsg = document.getElementById('submit-error-message');
+            if(!submitBtn || !errorMsg) return;
+
+            let isAllValid = true;
+            let missingSections = []; // To track what's missing
+
+            // 1. Check all sections flagged as mandatory
+            sections.forEach(section => {
+                if (!section.mandatory) return; // Skip non-mandatory sections
+
+                const sectionData = caseData[section.id];
+                let isSectionComplete = false;
+
+                switch(section.id) {
+                    case 'particulars':
+                        const pSection = sections.find(s => s.id === 'particulars');
+                        if (pSection) {
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = pSection.content;
+                            let allPFieldsOk = true;
+                            tempDiv.querySelectorAll('[data-mandatory="true"]').forEach(el => {
+                                if (!caseData.particulars || !caseData.particulars[el.id] || caseData.particulars[el.id].trim() === "") {
+                                    allPFieldsOk = false;
+                                }
+                            });
+                            isSectionComplete = allPFieldsOk;
+                        }
+                        break;
+                    case 'time-log':
+                        // Check if at least one value is present
+                        isSectionComplete = Object.values(caseData['time-log'] || {}).some(val => val && val.trim() !== '');
+                        break;
+                    case 'initial-assessment':
+                        // Check if at least one value is present
+                        isSectionComplete = Object.values(caseData['initial-assessment'] || {}).some(val => val && val.trim() !== '');
+                        break;
+                    case 'gcs':
+                        // Check if at least one GCS entry has E, V, and M filled
+                        isSectionComplete = (caseData.gcs || []).some(g => g.e && g.v && g.m);
+                        break;
+                    case 'pupils':
+                        isSectionComplete = caseData.pupils && caseData.pupils['input-pupil-reactive'] && caseData.pupils['input-pupil-reactive'] !== "";
+                        break;
+                    case 'vitals':
+                        // Check if at least one vital sign in any set has been recorded
+                        isSectionComplete = (caseData.vitals || []).some(v =>
+                            v.temp || v.pulse || v.bp_s || v.bp_d || v.spo2 || v.resp || v.pain
+                        );
+                        break;
+                    case 'history':
+                        // Check if all 3 dropdowns have a value
+                        isSectionComplete = caseData.history &&
+                            caseData.history['input-history-meds-select'] && caseData.history['input-history-meds-select'] !== "" &&
+                            caseData.history['input-history-allergies-select'] && caseData.history['input-history-allergies-select'] !== "" &&
+                            caseData.history['input-history-pmh-select'] && caseData.history['input-history-pmh-select'] !== "";
+                        break;
+                }
+
+                if (!isSectionComplete) {
+                    isAllValid = false;
+                    missingSections.push(section.title);
+                }
+            });
+
+             // 2. Check Conditional Mandatory Glucose
+            const avpuValue = caseData['initial-assessment']?.['input-avpu'];
+            const needsGlucose = ['Verbal', 'Pain', 'Unresponsive'].includes(avpuValue);
+            if (needsGlucose) {
+                const glucose1st = caseData['ecg-glucose']?.['input-glucose-1st'];
+                if (!glucose1st || glucose1st.trim() === '') {
+                    isAllValid = false;
+                    if (!missingSections.includes("8. ECG & Glucose")) {
+                        missingSections.push("Glucose (Required)"); // Be more specific
+                    }
+                }
+            }
+             // Update Glucose UI indicator regardless of section completeness check
+            updateGlucoseMandatoryUI();
+
+
+            // 3. Check conditional mandatory fields (Outcome)
+            const outcomeData = caseData.outcome || {};
+            if (outcomeData['input-outcome-echelon'] === 'Yes') {
+                let outcomeFieldsOk = true;
+                if (!outcomeData['input-outcome-location'] || outcomeData['input-outcome-location'].trim() === '') outcomeFieldsOk = false;
+                if (!outcomeData['input-outcome-hoto'] || outcomeData['input-outcome-hoto'].trim() === '') outcomeFieldsOk = false;
+                if (!outcomeData['input-outcome-received-by'] || outcomeData['input-outcome-received-by'].trim() === '') outcomeFieldsOk = false;
+
+                if (!outcomeFieldsOk) {
+                    isAllValid = false;
+                    if (!missingSections.includes("11. Outcome")) { // Adjusted section number
+                        missingSections.push("11. Outcome (Details)");
+                    }
+                }
+            }
+
+            // 4. Update UI
+            submitBtn.disabled = !isAllValid;
+            if (isAllValid) {
+                errorMsg.classList.add('hidden');
+            } else {
+                errorMsg.classList.remove('hidden');
+                // Optional: Provide more detailed feedback
+                // errorMsg.textContent = `Missing: ${missingSections.map(s => s.split('.')[0]).join(', ')}`;
+            }
+        }
+
+
+        function setCurrentDate() {
+            const dateInput = document.getElementById('input-date');
+            if (dateInput) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                dateInput.value = `${year}-${month}-${day}`;
+
+                // Manually save this change to check mandatory fields
+                if (!caseData.particulars) caseData.particulars = {};
+                caseData.particulars['input-date'] = dateInput.value;
+                checkMandatoryFields();
+            }
+        }
+
+        // --- New function for Outcome section ---
+        function toggleOutcomeDetails(value) {
+            const container = document.getElementById('outcome-details-container');
+            if (container) {
+                container.classList.toggle('hidden', value !== 'Yes');
+                const inputs = container.querySelectorAll('input');
+                inputs.forEach(input => {
+                    // Don't disable, just clear if hiding
+                    if (value !== 'Yes') {
+                         input.value = '';
+                         // Also clear this from the live data
+                         if(caseData.outcome && caseData.outcome[input.id]) {
+                             caseData.outcome[input.id] = '';
+                         }
+                    }
+                });
+                // Re-check mandatory fields when toggling
+                // We need to save the change to 'input-outcome-echelon' first
+                if(!caseData.outcome) caseData.outcome = {};
+                caseData.outcome['input-outcome-echelon'] = value;
+                checkMandatoryFields();
+            }
+        }
+
+        function setCurrentTime(fieldIdPrefix) {
+            const hrSelect = document.getElementById(`${fieldIdPrefix}-hr`);
+            const minSelect = document.getElementById(`${fieldIdPrefix}-min`);
+            if (hrSelect && minSelect) {
+                const now = new Date();
+                hrSelect.value = String(now.getHours()).padStart(2, '0');
+                minSelect.value = String(now.getMinutes()).padStart(2, '0');
+
+                // Manually save this change
+                if (!caseData['time-log']) caseData['time-log'] = {};
+                caseData['time-log'][`${fieldIdPrefix}-hr`] = hrSelect.value;
+                caseData['time-log'][`${fieldIdPrefix}-min`] = minSelect.value;
+                checkMandatoryFields();
+            }
+        }
+
+        function setCurrentDateTime(fieldId) {
+             const dateTimeInput = document.getElementById(fieldId);
+             if(dateTimeInput){
+                const now = new Date();
+                const date = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+                const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                dateTimeInput.value = `${date} ${time}`;
+
+                // Manually save this change
+                if (!caseData.outcome) caseData.outcome = {};
+                caseData.outcome[fieldId] = dateTimeInput.value;
+                checkMandatoryFields();
+             }
+        }
+
+        // --- Helper function to save data from the active section ---
+        function saveActiveSectionData() {
+            const contentContainer = document.getElementById('section-content-container');
+            if (!contentContainer || !activeSectionId) return false;
+
+            try {
+                // Special handlers for dynamic sections
+                if (activeSectionId === 'vitals') {
+                    const vitalsData = [];
+                    const vitalsSets = contentContainer.querySelectorAll('div[id^="vitals-set-"]');
+                    vitalsSets.forEach(set => {
+                        const setId = set.id;
+                        const setData = {
+                            setId: setId,
+                            time: document.getElementById(`vitals-time-${setId}`).value,
+                            isConfirmed: set.querySelector('button[id^="vitals-confirm-btn-"]').disabled,
+                        };
+                        const inputs = set.querySelectorAll('input');
+                        inputs.forEach(input => {
+                            if (!input.id.startsWith('vitals-time')) {
+                                const key = input.id.replace(`-${setId}`, '');
+                                setData[key] = input.value;
+                            }
+                        });
+                        vitalsData.push(setData);
+                    });
+                    caseData.vitals = vitalsData;
+
+                } else if (activeSectionId === 'gcs') {
+                    const gcsData = [];
+                    const gcsEntries = contentContainer.querySelectorAll('div[id^="gcs-entry-"]');
+                    gcsEntries.forEach(entry => {
+                        const entryId = entry.id;
+                        const entryData = {
+                            entryId: entryId,
+                            time: document.getElementById(`gcs-time-${entryId}`).value,
+                            e: document.getElementById(`gcs-e-${entryId}`).value,
+                            v: document.getElementById(`gcs-v-${entryId}`).value,
+                            m: document.getElementById(`gcs-m-${entryId}`).value,
+                            isConfirmed: document.getElementById(`gcs-confirm-btn-${entryId}`).disabled,
+                        };
+                        gcsData.push(entryData);
+                    });
+                    caseData.gcs = gcsData;
+
+                } else {
+                    // Generic handler for simple sections
+                    if (!caseData[activeSectionId]) {
+                        caseData[activeSectionId] = {};
+                    }
+                    const inputs = contentContainer.querySelectorAll('input, select, textarea');
+                    inputs.forEach(input => {
+                        if (input.id) {
+                             if (input.type === 'checkbox') {
+                                 caseData[activeSectionId][input.id] = input.checked;
+                             } else {
+                                 caseData[activeSectionId][input.id] = input.value;
+                             }
+                        }
+                    });
+                }
+                return true; // Save successful
+            } catch (error) {
+                console.error("Error saving section data:", error);
+                return false; // Save failed
+            }
+        }
+
+        // --- Updated saveDraft function ---
+        function saveDraft() {
+            if (saveActiveSectionData()) {
+                // Update mock database and show feedback
+                if (!mockDatabase[currentCaseId]) mockDatabase[currentCaseId] = {};
+                mockDatabase[currentCaseId] = JSON.parse(JSON.stringify(caseData));
+
+                checkMandatoryFields(); // Re-check after saving
+
+                const saveBtn = document.getElementById('footer-save-draft');
+                saveBtn.textContent = 'Saved!';
+                saveBtn.classList.replace('bg-accent-blue', 'bg-accent-green');
+                setTimeout(() => {
+                    saveBtn.textContent = 'Save Draft';
+                    saveBtn.classList.replace('bg-accent-green', 'bg-accent-blue');
+                }, 1500);
+
+                console.log("Updated Mock DB:", JSON.stringify(mockDatabase, null, 2));
+            }
+        }
+
+
+        function openModal() {
+            if (document.getElementById('footer-submit').disabled) return;
+            document.getElementById('submit-modal').classList.replace('hidden', 'flex');
+        }
+
+        function closeModal() {
+            document.getElementById('submit-modal').classList.replace('flex', 'hidden');
+        }
+
+        async function finalizeCase() {
+            // Final check just in case
+            saveActiveSectionData();
+            checkMandatoryFields();
+            if (document.getElementById('footer-submit').disabled) {
+                console.error("Submit button is disabled, cannot finalize.");
+                closeModal();
+                return;
+            }
+
+            closeModal();
+            console.log(`Finalizing case ${currentCaseId}...`);
+            await generatePdfReport(currentCaseId);
+
+            const submitBtn = document.getElementById('footer-submit');
+            submitBtn.textContent = 'Case Finalized';
+            submitBtn.disabled = true;
+            submitBtn.classList.replace('bg-accent-red', 'bg-gray-500');
+
+            console.log(`Case ${currentCaseId} finalized. Document locked.`);
+            setTimeout(showHome, 1500);
+        }
+
+        function updateSnapshotTime() {
+            const timeEl = document.getElementById('snapshot-time');
+            const ampmEl = document.getElementById('snapshot-ampm');
+            if (timeEl && ampmEl) {
+                // Using a fixed time for this demo based on your last update
+                // A real app would use new Date()
+                const now = new Date('2025-10-23T09:24:00+08:00');
+                let hours = now.getHours();
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12;
+                hours = hours ? hours : 12; // the hour '0' should be '12'
+                const hoursStr = String(hours).padStart(2, '0');
+
+                timeEl.textContent = `${hoursStr}:${minutes}`;
+                ampmEl.textContent = ampm;
+            }
+        }
+
+        // --- Updated window.onload ---
+        window.onload = function() {
+            showHome();
+            updateSnapshotTime();
+
+            // Unified event listener for inputs and textareas
+            document.body.addEventListener('input', (event) => {
+                const target = event.target;
+                if (target.closest('#section-content-container') && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+                    saveActiveSectionData(); // Save data on input
+                    checkMandatoryFields(); // Re-check validation
+                }
+            });
+
+            // Unified event listener for selects and checkboxes
+            document.body.addEventListener('change', (event) => {
+                 const target = event.target;
+                 if (target.closest('#section-content-container') && (target.tagName === 'SELECT' || target.type === 'checkbox')) {
+                    saveActiveSectionData(); // Save data on change
+
+                    // Special case for conditional logic triggers & mandatory checks
+                    let recheckNeeded = true; // Assume we need to recheck unless handled specially
+
+                    if (target.id === 'input-avpu') {
+                         // AVPU change directly impacts Glucose requirement
+                         updateGlucoseMandatoryUI();
+                         // checkMandatoryFields will handle the rest
+                    } else if (target.id === 'input-outcome-echelon') {
+                        toggleOutcomeDetails(target.value); // This already calls checkMandatoryFields
+                        recheckNeeded = false; // Already handled by toggleOutcomeDetails
+                    } else if (target.id === 'input-history-meds-select') {
+                         toggleHistorySpecify(target.value, 'history-meds-specify-container');
+                    } else if (target.id === 'input-history-allergies-select') {
+                         toggleHistorySpecify(target.value, 'history-allergies-specify-container');
+                    } else if (target.id === 'input-history-pmh-select') {
+                         toggleHistorySpecify(target.value, 'history-pmh-specify-container');
+                    } else if (target.id === 'input-ecg') {
+                        toggleEcgRhythm(target.value);
+                    }
+
+                    if(recheckNeeded){
+                        checkMandatoryFields(); // Re-check validation
+                    }
+                }
+            });
+        };
+    </script>
+
+</body>
+</html>
+
